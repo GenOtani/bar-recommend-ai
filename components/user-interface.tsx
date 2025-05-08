@@ -46,6 +46,7 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
   const [quantityDialogOpen, setQuantityDialogOpen] = useState(false)
   const [selectedQuantity, setSelectedQuantity] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [inputText, setInputText] = useState("")
 
   // グローバルステートから注文履歴を取得
   const { orders, addOrder } = useOrderStore()
@@ -615,7 +616,34 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
               </ScrollArea>
             </CardContent>
             <CardFooter className="border-t border-zinc-700 p-4">
-              <div className="flex w-full items-center gap-2">
+              <form
+                className="flex w-full items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (inputText.trim()) {
+                    handleUserInput(inputText)
+                    setInputText("")
+                  }
+                }}
+              >
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="メッセージを入力..."
+                    className="w-full rounded-md bg-zinc-700 border-zinc-600 text-white px-4 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="default"
+                  className="bg-amber-600 hover:bg-amber-700"
+                  disabled={!inputText.trim() || isLoading}
+                >
+                  送信
+                </Button>
                 {isListening ? (
                   <Button
                     onClick={toggleListening}
@@ -623,24 +651,14 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
                     className="rounded-full bg-red-600 hover:bg-red-700"
                     disabled={isLoading}
                   >
-                    <MicOff className="h-5 w-5 mr-2" />
-                    停止
+                    <MicOff className="h-5 w-5" />
                   </Button>
                 ) : (
-                  <Button
-                    onClick={toggleListening}
-                    variant="default"
-                    className="rounded-full bg-amber-600 hover:bg-amber-700"
-                    disabled={isLoading}
-                  >
-                    <Mic className="h-5 w-5 mr-2" />
-                    話しかける
+                  <Button onClick={toggleListening} variant="outline" className="rounded-full" disabled={isLoading}>
+                    <Mic className="h-5 w-5" />
                   </Button>
                 )}
-                <p className="text-sm text-zinc-400 flex-1 text-center">
-                  {isListening ? "聞いています..." : "マイクボタンを押して話しかけてください"}
-                </p>
-              </div>
+              </form>
             </CardFooter>
           </Card>
         </TabsContent>
