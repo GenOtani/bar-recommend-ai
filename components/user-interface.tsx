@@ -97,8 +97,22 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     // 音声合成の初期化
     synthesisRef.current = new SpeechSynthesisUtterance()
     synthesisRef.current.lang = "ja-JP"
-    synthesisRef.current.rate = 1.0
-    synthesisRef.current.pitch = 1.0
+    synthesisRef.current.rate = 0.9 // 少し遅めに設定（0.1〜10の範囲、デフォルトは1）
+    synthesisRef.current.pitch = 1.0 // 音の高さ（0〜2の範囲、デフォルトは1）
+
+    // 利用可能な音声から日本語の音声を選択
+    window.speechSynthesis.onvoiceschanged = () => {
+      const voices = window.speechSynthesis.getVoices()
+      const japaneseVoices = voices.filter((voice) => voice.lang.includes("ja") || voice.name.includes("Japanese"))
+
+      if (japaneseVoices.length > 0) {
+        // 日本語の音声が見つかった場合は最初のものを使用
+        synthesisRef.current!.voice = japaneseVoices[0]
+        console.log("日本語の音声を設定しました:", japaneseVoices[0].name)
+      } else {
+        console.warn("日本語の音声が見つかりませんでした。デフォルトの音声を使用します。")
+      }
+    }
 
     synthesisRef.current.onend = () => {
       setIsSpeaking(false)
@@ -142,8 +156,31 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
       setIsSpeaking(false)
     } else {
       if (synthesisRef.current) {
-        synthesisRef.current.text = text
-        window.speechSynthesis.speak(synthesisRef.current)
+        // 長い文章を適切に区切って読み上げる
+        const sentences = text.split(/[。.!?！？]/g).filter((s) => s.trim().length > 0)
+
+        // 文章を読み上げる関数
+        const speakSentences = (index = 0) => {
+          if (index >= sentences.length) return
+
+          const sentence = sentences[index] + "。" // 句点を追加
+          synthesisRef.current!.text = sentence
+
+          synthesisRef.current!.onend = () => {
+            // 次の文章を読み上げる
+            speakSentences(index + 1)
+
+            // 最後の文章が終わったらフラグを更新
+            if (index === sentences.length - 1) {
+              setIsSpeaking(false)
+            }
+          }
+
+          window.speechSynthesis.speak(synthesisRef.current!)
+        }
+
+        // 読み上げ開始
+        speakSentences()
         setIsSpeaking(true)
       }
     }
