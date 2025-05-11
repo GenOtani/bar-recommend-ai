@@ -207,6 +207,20 @@ export function AdminInterface() {
             duration: 2000,
           })
 
+          // 同期イベントを発火して他のタブにも通知
+          try {
+            localStorage.setItem(
+              "order-sync-event",
+              JSON.stringify({
+                type: "manual-refresh",
+                timestamp: Date.now(),
+                count: parsedData.state.orders.length,
+              }),
+            )
+          } catch (error) {
+            console.error("同期イベントの発火に失敗:", error)
+          }
+
           return true
         } else {
           console.warn("localStorage の注文データの形式が不正です")

@@ -5,6 +5,11 @@ import { useOrderStore } from "@/store/order-store"
 import { useNotificationStore, type Notification } from "@/store/notification-store"
 import { toast } from "@/components/ui/use-toast"
 
+// デバッグ用のログ関数
+const logDebug = (message: string, data?: any) => {
+  console.log(`[TabSyncManager] ${message}`, data || "")
+}
+
 export function TabSyncManager() {
   const { orders, syncOrders, forceUpdate } = useOrderStore()
   const { notifications, unreadCount, syncNotifications } = useNotificationStore()
@@ -14,11 +19,14 @@ export function TabSyncManager() {
     lastSyncAttempt: string
     lastSuccessfulSync: string
     syncCount: number
+    lastEventType: string
   }>({
     lastSyncAttempt: "なし",
     lastSuccessfulSync: "なし",
     syncCount: 0,
+    lastEventType: "なし",
   })
+  const isInitialSyncDoneRef = useRef(false)
 
   // 注文データの同期 - イベントベース
   useEffect(() => {
@@ -27,24 +35,27 @@ export function TabSyncManager() {
         try {
           const syncEvent = JSON.parse(event.newValue)
           const currentTime = Date.now()
+          const eventType = syncEvent.type || "不明"
 
           // デバッグ情報を更新
           setDebugInfo((prev) => ({
             ...prev,
             lastSyncAttempt: new Date().toLocaleTimeString(),
             syncCount: prev.syncCount + 1,
+            lastEventType: eventType,
           }))
+
+          logDebug(`同期イベント受信: ${eventType}`)
 
           // 最後の同期から100ms以上経過している場合のみ処理（連続イベントの防止）
           if (currentTime - lastSyncTimeRef.current > 100) {
             lastSyncTimeRef.current = currentTime
 
-            console.log("同期イベントを受信しました:", syncEvent.type)
-
             // 最新のデータを取得
             const success = forceUpdate()
 
             if (success) {
+              logDebug(`同期成功: ${eventType}`)
               setDebugInfo((prev) => ({
                 ...prev,
                 lastSuccessfulSync: new Date().toLocaleTimeString(),
@@ -66,7 +77,7 @@ export function TabSyncManager() {
                 }
               }
             } else {
-              console.warn("同期に失敗しました")
+              logDebug(`同期に変更なし: ${eventType}`)
             }
           }
         } catch (error) {
@@ -79,35 +90,46 @@ export function TabSyncManager() {
 
     // 初回マウント時に強制同期
     const initialSync = () => {
+      if (isInitialSyncDoneRef.current) return
+
+      logDebug("初期同期を実行")
       const success = forceUpdate()
-      console.log("初期同期結果:", success)
+      logDebug(`初期同期結果: ${success ? "成功" : "変更なし"}`)
+
       if (success) {
         setDebugInfo((prev) => ({
           ...prev,
           lastSuccessfulSync: new Date().toLocaleTimeString(),
         }))
       }
+
+      isInitialSyncDoneRef.current = true
     }
 
     // 少し遅延させて初期同期を実行（他のコンポーネントの初期化後）
-    const initTimer = setTimeout(initialSync, 500)
+    const initTimer = setTimeout(initialSync, 1000)
 
-    // 定期的なポーリングを設定（5秒ごと）
+    // 定期的なポーリングを設定（8秒ごと）
     syncIntervalRef.current = setInterval(() => {
       setDebugInfo((prev) => ({
         ...prev,
         lastSyncAttempt: new Date().toLocaleTimeString(),
       }))
 
+      logDebug("定期同期を実行")
       const success = forceUpdate()
+
       if (success) {
+        logDebug("定期同期成功")
         setDebugInfo((prev) => ({
           ...prev,
           lastSuccessfulSync: new Date().toLocaleTimeString(),
           syncCount: prev.syncCount + 1,
         }))
+      } else {
+        logDebug("定期同期に変更なし")
       }
-    }, 5000)
+    }, 8000)
 
     return () => {
       window.removeEventListener("storage", handleOrderStorageChange)
@@ -124,6 +146,7 @@ export function TabSyncManager() {
       if (event.key === "notification-sync-event" && event.newValue) {
         try {
           const syncEvent = JSON.parse(event.newValue)
+          logDebug(`通知同期イベント受信: ${syncEvent.type || "不明"}`)
 
           // 最新のデータを取得
           const notificationStorageData = localStorage.getItem("notification-storage")
@@ -136,6 +159,7 @@ export function TabSyncManager() {
               ).length
 
               syncNotifications(parsedData.state.notifications, newUnreadCount)
+              logDebug(`通知同期完了: ${parsedData.state.notifications.length}件`)
 
               // 新しい通知の場合、サウンドを再生
               if (syncEvent.type === "add-notification" && typeof window !== "undefined") {
@@ -165,7 +189,7 @@ export function TabSyncManager() {
 
   // デバッグ情報をコンソールに出力
   useEffect(() => {
-    console.log("TabSyncManager デバッグ情報:", debugInfo)
+    logDebug("デバッグ情報更新:", debugInfo)
   }, [debugInfo])
 
   // このコンポーネントは何もレンダリングしない

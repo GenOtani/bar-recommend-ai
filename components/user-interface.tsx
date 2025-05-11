@@ -444,49 +444,53 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     console.log("作成された注文:", newOrder)
 
     try {
-      // グローバルステートに注文を追加
-      addOrder(newOrder)
-      console.log("注文がグローバルステートに追加されました")
+      // 現在の注文データを取得
+      let currentOrders: Order[] = []
+      try {
+        const orderStorageData = localStorage.getItem("order-storage")
+        if (orderStorageData) {
+          const parsedData = JSON.parse(orderStorageData)
+          if (parsedData.state && Array.isArray(parsedData.state.orders)) {
+            currentOrders = parsedData.state.orders
+            console.log("既存の注文データを読み込みました:", currentOrders.length)
+          }
+        }
+      } catch (error) {
+        console.error("既存の注文データの読み込みに失敗しました:", error)
+      }
 
-      // 通知を追加
-      addNotification(createOrderNotification(newOrder))
-
-      // 同期を強制的に実行するためのイベントを発火
-      localStorage.setItem(
-        "order-sync-event",
-        JSON.stringify({
-          type: "add-order",
-          timestamp: Date.now(),
-          order: newOrder,
-        }),
-      )
+      // 新しい注文を追加
+      const updatedOrders = [...currentOrders, newOrder]
 
       // 直接 localStorage に保存して確実に反映されるようにする
       try {
         const orderStorageData = localStorage.getItem("order-storage")
         if (orderStorageData) {
           const parsedData = JSON.parse(orderStorageData)
-          if (parsedData.state && Array.isArray(parsedData.state.orders)) {
-            // 既存の注文に新しい注文を追加
-            const updatedOrders = [...parsedData.state.orders, newOrder]
 
-            // 更新したデータを保存
-            const updatedData = {
-              ...parsedData,
-              state: {
-                ...parsedData.state,
-                orders: updatedOrders,
-                lastUpdated: Date.now(),
-              },
-            }
-
-            localStorage.setItem("order-storage", JSON.stringify(updatedData))
-            console.log("注文データを直接 localStorage に保存しました")
+          // 更新したデータを保存
+          const updatedData = {
+            ...parsedData,
+            state: {
+              ...parsedData.state,
+              orders: updatedOrders,
+              lastUpdated: Date.now(),
+            },
           }
+
+          localStorage.setItem("order-storage", JSON.stringify(updatedData))
+          console.log("注文データを直接 localStorage に保存しました:", updatedOrders.length)
         }
       } catch (error) {
         console.error("localStorage への直接保存に失敗しました:", error)
       }
+
+      // グローバルステートに注文を追加（これは上記の localStorage 更新後に行う）
+      addOrder(newOrder)
+      console.log("注文がグローバルステートに追加されました")
+
+      // 通知を追加
+      addNotification(createOrderNotification(newOrder))
 
       // スプレッドシートに注文データを送信
       sendOrderToSpreadsheet(newOrder)
