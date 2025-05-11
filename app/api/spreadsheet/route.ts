@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { google } from "googleapis"
 import { JWT } from "google-auth-library"
 import type { Order } from "@/types/order-types"
+import nodemailer from "nodemailer"
 
 // Google Sheets APIの認証情報
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n")
@@ -157,6 +158,192 @@ export const initializeSpreadsheet = async () => {
   }
 }
 
+// 通知設定を取得する関数
+const getNotificationSettings = () => {
+  // 実際のアプリケーションでは、データベースやファイルから設定を読み込む
+  // ここでは環境変数から読み込む例を示す
+  return {
+    email: {
+      enabled: !!process.env.EMAIL_ENABLED && process.env.EMAIL_ENABLED === "true",
+      recipientEmail: process.env.NOTIFICATION_EMAIL,
+      user: process.env.EMAIL_USER,
+      password: process.env.EMAIL_PASSWORD,
+    },
+    slack: {
+      enabled: !!process.env.SLACK_ENABLED && process.env.SLACK_ENABLED === "true",
+      webhookUrl: process.env.SLACK_WEBHOOK_URL,
+    },
+    line: {
+      enabled: !!process.env.LINE_ENABLED && process.env.LINE_ENABLED === "true",
+      token: process.env.LINE_NOTIFY_TOKEN,
+    },
+  }
+}
+
+// 通知を送信する関数
+const sendNotifications = async (order: Order) => {
+  const settings = getNotificationSettings()
+  const results = {
+    email: false,
+    slack: false,
+    line: false,
+  }
+
+  // メール通知
+  if (settings.email.enabled && settings.email.recipientEmail && settings.email.user && settings.email.password) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: settings.email.user,
+          pass: settings.email.password,
+        },
+      })
+
+      // 注文内容をテキスト形式に整形
+      const orderItems = order.items.map((item) => `${item.name} x ${item.quantity} (${item.price})`).join("\n")
+
+      const mailOptions = {
+        from: settings.email.user,
+        to: settings.email.recipientEmail,
+        subject: `新規注文: テーブル${order.tableNumber} - ${order.id}`,
+        text: `
+新しい注文が入りました。
+
+注文ID: ${order.id}
+テーブル番号: ${order.tableNumber}
+注文時間: ${new Date(order.timestamp).toLocaleString()}
+合計金額: ${order.totalAmount}円
+
+注文内容:
+${orderItems}
+
+スプレッドシートURL: https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID}
+        `,
+      }
+
+      await transporter.sendMail(mailOptions)
+      console.log("通知メールを送信しました")
+      results.email = true
+    } catch (error) {
+      console.error("メール送信エラー:", error)
+    }
+  }
+
+  // Slack通知
+  if (settings.slack.enabled && settings.slack.webhookUrl) {
+    try {
+      // 注文内容をテキスト形式に整形
+      const orderItems = order.items.map((item) => `• ${item.name} x ${item.quantity} (${item.price})`).join("\n")
+
+      // Slackメッセージの構造
+      const message = {
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: `🍸 新規注文: テーブル${order.tableNumber}`,
+              emoji: true,
+            },
+          },
+          {
+            type: "section",
+            fields: [
+              {
+                type: "mrkdwn",
+                text: `*注文ID:*\n${order.id}`,
+              },
+              {
+                type: "mrkdwn",
+                text: `*時間:*\n${new Date(order.timestamp).toLocaleString()}`,
+              },
+            ],
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*注文内容:*\n${orderItems}`,
+            },
+          },
+          {
+            type: "section",
+            fields: [
+              {
+                type: "mrkdwn",
+                text: `*合計金額:*\n${order.totalAmount}円`,
+              },
+              {
+                type: "mrkdwn",
+                text: `*ステータス:*\n${order.status}`,
+              },
+            ],
+          },
+        ],
+      }
+
+      const response = await fetch(settings.slack.webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(message),
+      })
+
+      if (response.ok) {
+        console.log("Slack通知を送信しました")
+        results.slack = true
+      } else {
+        console.error("Slack通知の送信に失敗しました:", await response.text())
+      }
+    } catch (error) {
+      console.error("Slack通知エラー:", error)
+    }
+  }
+
+  // LINE通知
+  if (settings.line.enabled && settings.line.token) {
+    try {
+      // 注文内容をテキスト形式に整形
+      const orderItems = order.items.map((item) => `${item.name} x ${item.quantity} (${item.price})`).join("\n")
+
+      // メッセージ本文
+      const message = `
+新規注文 (${order.id})
+テーブル: ${order.tableNumber}
+時間: ${new Date(order.timestamp).toLocaleString()}
+合計: ${order.totalAmount}円
+
+${orderItems}
+`
+
+      const params = new URLSearchParams()
+      params.append("message", message)
+
+      const response = await fetch("https://notify-api.line.me/api/notify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Bearer ${settings.line.token}`,
+        },
+        body: params,
+      })
+
+      if (response.ok) {
+        console.log("LINE通知を送信しました")
+        results.line = true
+      } else {
+        console.error("LINE通知の送信に失敗しました:", await response.text())
+      }
+    } catch (error) {
+      console.error("LINE通知エラー:", error)
+    }
+  }
+
+  return results
+}
+
 export async function POST(request: Request) {
   try {
     const { order } = await request.json()
@@ -179,6 +366,11 @@ export async function POST(request: Request) {
     }
 
     const success = await appendOrderToSheet(order)
+
+    // 通知を送信
+    if (success || process.env.NODE_ENV === "development") {
+      await sendNotifications(order)
+    }
 
     if (success) {
       return NextResponse.json({ success: true, message: "注文がスプレッドシートに追加されました" })

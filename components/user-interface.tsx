@@ -17,6 +17,8 @@ import { toast } from "@/components/ui/use-toast"
 import { cocktails, foods, categorizedCocktails } from "@/data/menu-data"
 import type { CartItem, Order } from "@/types/order-types"
 import { useOrderStore } from "@/store/order-store"
+// 既存のインポートに追加
+import { useNotificationStore, createOrderNotification } from "@/store/notification-store"
 
 interface UserInterfaceProps {
   tableNumber: string
@@ -50,6 +52,9 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
 
   // グローバルステートから注文履歴を取得
   const { orders, addOrder } = useOrderStore()
+
+  // 通知ストアから関数を取得
+  const { addNotification } = useNotificationStore()
 
   const recognitionRef = useRef<any>(null)
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null)
@@ -402,7 +407,7 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     }
   }
 
-  // カート内の注文を確定する処理
+  // カート内の注文を確定する処理を修正
   const handleOrderConfirm = (e: React.MouseEvent) => {
     e.preventDefault() // デフォルトの動作を防止
     console.log("注文確定ボタンがクリックされました")
@@ -431,6 +436,9 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     // グローバルステートに注文を追加
     addOrder(newOrder)
     console.log("注文がグローバルステートに追加されました")
+
+    // 通知を追加
+    addNotification(createOrderNotification(newOrder))
 
     // スプレッドシートに注文データを送信
     sendOrderToSpreadsheet(newOrder)
