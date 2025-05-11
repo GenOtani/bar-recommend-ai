@@ -277,7 +277,7 @@ const cocktails = [
     name: "ピーチソーダ",
     ingredients: ["ピーチリキュール", "ソーダ"],
     description: "ピーチリキュールをソーダで割った、爽やかな炭酸感が楽しめるカクテル。",
-    tags: ["ピーチ", "爽やか", "炭酸", "さ���ぱり", "透明", "夏向き", "食前酒", "女性人気", "香り高い"],
+    tags: ["ピーチ", "爽やか", "炭酸", "さっぱり", "透明", "夏向き", "食前酒", "女性人気", "香り高い"],
     category: "果実酒とリキュール",
     price: "500円",
     priceValue: 500,
@@ -765,7 +765,7 @@ export default function CocktailChatbot() {
     }
   }
 
-  // 管理者ログアウト処理
+  // 管理者ログアウト処理も確認
   const handleAdminLogout = () => {
     setIsAdmin(false)
     toast({
