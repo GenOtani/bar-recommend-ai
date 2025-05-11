@@ -124,10 +124,13 @@ export function SpreadsheetSetup() {
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="bg-zinc-800 border-zinc-700 text-white">
+        <DialogContent
+          className="bg-zinc-800 border-zinc-700 text-white"
+          aria-describedby="spreadsheet-setup-description"
+        >
           <DialogHeader>
             <DialogTitle className="text-amber-400">Googleスプレッドシートの設定</DialogTitle>
-            <DialogDescription className="text-zinc-400">
+            <DialogDescription id="spreadsheet-setup-description" className="text-zinc-400">
               注文データを自動的にGoogleスプレッドシートに送信するための設定を行います。
             </DialogDescription>
           </DialogHeader>

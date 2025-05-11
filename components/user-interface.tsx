@@ -493,10 +493,13 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     <div className="w-full max-w-2xl">
       {/* 数量選択ダイアログ */}
       <Dialog open={quantityDialogOpen} onOpenChange={setQuantityDialogOpen}>
-        <DialogContent className="bg-zinc-800 border-zinc-700 text-white">
+        <DialogContent
+          className="bg-zinc-800 border-zinc-700 text-white"
+          aria-describedby="quantity-dialog-description"
+        >
           <DialogHeader>
             <DialogTitle className="text-amber-400">数量選択</DialogTitle>
-            <DialogDescription className="text-zinc-400">
+            <DialogDescription id="quantity-dialog-description" className="text-zinc-400">
               {selectedItem ? selectedItem.name : ""}の注文数を選択してください
             </DialogDescription>
           </DialogHeader>
@@ -530,7 +533,7 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
         </DialogContent>
       </Dialog>
 
-      <Tabs defaultValue="chat" className="w-full" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="chat" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3 mb-4">
           <TabsTrigger value="chat">チャット</TabsTrigger>
           <TabsTrigger value="menu">メニュー</TabsTrigger>

@@ -106,7 +106,7 @@ export function AdminInterface() {
           rows.push([
             order.id,
             order.tableNumber,
-            order.timestamp.toLocaleString(),
+            new Date(order.timestamp).toLocaleString(),
             item.name,
             item.priceValue.toString(),
             item.quantity.toString(),
@@ -248,156 +248,158 @@ export function AdminInterface() {
       </div>
 
       <div className="flex justify-between items-center mb-4">
-        <Tabs defaultValue="orders" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="orders">注文履歴</TabsTrigger>
-            <TabsTrigger value="analytics">売上分析</TabsTrigger>
-            <TabsTrigger value="settings">設定</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="w-full">
+          <Tabs defaultValue="orders" value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="orders">注文履歴</TabsTrigger>
+              <TabsTrigger value="analytics">売上分析</TabsTrigger>
+              <TabsTrigger value="settings">設定</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="orders">
+              <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
+                <CardHeader className="border-b border-zinc-700">
+                  <CardTitle className="text-amber-400">注文履歴</CardTitle>
+                  <CardDescription className="text-zinc-400">全ての注文履歴を確認できます</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[500px] p-4">
+                    {orders.length === 0 ? (
+                      <div className="py-6 text-center text-zinc-400">注文履歴がありません</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {orders
+                          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                          .map((order) => (
+                            <div key={order.id} className="bg-zinc-700 rounded-md p-4">
+                              <div className="flex justify-between items-center mb-2">
+                                <div>
+                                  <div className="font-bold text-amber-400">{order.id}</div>
+                                  <div className="text-sm text-zinc-400">
+                                    {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
+                                  </div>
+                                </div>
+                                <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                                  {order.status}
+                                </Badge>
+                              </div>
+                              <div className="space-y-2 mt-3">
+                                {order.items.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between text-sm">
+                                    <span>
+                                      {item.name} × {item.quantity}
+                                    </span>
+                                    <span>{item.price}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="border-t border-zinc-600 mt-3 pt-3 flex justify-between font-bold">
+                                <span>合計</span>
+                                <span>{order.totalAmount}円</span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics">
+              <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
+                <CardHeader className="border-b border-zinc-700">
+                  <CardTitle className="text-amber-400">売上分析</CardTitle>
+                  <CardDescription className="text-zinc-400">カテゴリー別の売上データを確認できます</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-4">カテゴリー別売上</h3>
+                      <div className="space-y-3">
+                        {Object.entries(categorySales).map(([category, data]) => (
+                          <div key={category} className="bg-zinc-700 p-3 rounded-md">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-medium">{category}</span>
+                              <span className="font-bold">{data.amount.toLocaleString()}円</span>
+                            </div>
+                            <div className="w-full bg-zinc-600 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-amber-500 h-full"
+                                style={{
+                                  width: `${totalSales > 0 ? (data.amount / totalSales) * 100 : 0}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="text-xs text-zinc-400 mt-1">
+                              {data.count}点 ({totalItems > 0 ? Math.round((data.count / totalItems) * 100) : 0}%)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-4">時間帯別注文数</h3>
+                      <div className="bg-zinc-700 p-4 rounded-md text-center">
+                        <p className="text-zinc-400">グラフ表示は準備中です</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="settings">
+              <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
+                <CardHeader className="border-b border-zinc-700">
+                  <CardTitle className="text-amber-400">システム設定</CardTitle>
+                  <CardDescription className="text-zinc-400">システムの設定を変更できます</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium">データ管理</h3>
+                      <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <Button className="bg-green-700 hover:bg-green-800" onClick={() => setExportDialogOpen(true)}>
+                            <Download className="h-4 w-4 mr-2" />
+                            データエクスポート
+                          </Button>
+                          <Button variant="outline" className="border-red-600 text-red-500 hover:bg-red-950">
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            データリセット
+                          </Button>
+                        </div>
+                        <SpreadsheetSetup />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-medium">システム情報</h3>
+                      <div className="bg-zinc-700 p-4 rounded-md">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="text-zinc-400">バージョン:</div>
+                          <div>1.0.0</div>
+                          <div className="text-zinc-400">最終更新日:</div>
+                          <div>{new Date().toLocaleDateString()}</div>
+                          <div className="text-zinc-400">注文データ数:</div>
+                          <div>{orders.length}件</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
 
         {/* 通知センターを追加 */}
         <div className="ml-4">
           <NotificationCenter />
         </div>
       </div>
-
-      <TabsContent value="orders">
-        <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
-          <CardHeader className="border-b border-zinc-700">
-            <CardTitle className="text-amber-400">注文履歴</CardTitle>
-            <CardDescription className="text-zinc-400">全ての注文履歴を確認できます</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px] p-4">
-              {orders.length === 0 ? (
-                <div className="py-6 text-center text-zinc-400">注文履歴がありません</div>
-              ) : (
-                <div className="space-y-4">
-                  {orders
-                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                    .map((order) => (
-                      <div key={order.id} className="bg-zinc-700 rounded-md p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <div>
-                            <div className="font-bold text-amber-400">{order.id}</div>
-                            <div className="text-sm text-zinc-400">
-                              {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
-                            </div>
-                          </div>
-                          <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
-                            {order.status}
-                          </Badge>
-                        </div>
-                        <div className="space-y-2 mt-3">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                              <span>
-                                {item.name} × {item.quantity}
-                              </span>
-                              <span>{item.price}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="border-t border-zinc-600 mt-3 pt-3 flex justify-between font-bold">
-                          <span>合計</span>
-                          <span>{order.totalAmount}円</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="analytics">
-        <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
-          <CardHeader className="border-b border-zinc-700">
-            <CardTitle className="text-amber-400">売上分析</CardTitle>
-            <CardDescription className="text-zinc-400">カテゴリー別の売上データを確認できます</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-bold text-white mb-4">カテゴリー別売上</h3>
-                <div className="space-y-3">
-                  {Object.entries(categorySales).map(([category, data]) => (
-                    <div key={category} className="bg-zinc-700 p-3 rounded-md">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-medium">{category}</span>
-                        <span className="font-bold">{data.amount.toLocaleString()}円</span>
-                      </div>
-                      <div className="w-full bg-zinc-600 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="bg-amber-500 h-full"
-                          style={{
-                            width: `${totalSales > 0 ? (data.amount / totalSales) * 100 : 0}%`,
-                          }}
-                        ></div>
-                      </div>
-                      <div className="text-xs text-zinc-400 mt-1">
-                        {data.count}点 ({totalItems > 0 ? Math.round((data.count / totalItems) * 100) : 0}%)
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold text-white mb-4">時間帯別注文数</h3>
-                <div className="bg-zinc-700 p-4 rounded-md text-center">
-                  <p className="text-zinc-400">グラフ表示は準備中です</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="settings">
-        <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
-          <CardHeader className="border-b border-zinc-700">
-            <CardTitle className="text-amber-400">システム設定</CardTitle>
-            <CardDescription className="text-zinc-400">システムの設定を変更できます</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">データ管理</h3>
-                <div className="flex flex-col gap-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Button className="bg-green-700 hover:bg-green-800" onClick={() => setExportDialogOpen(true)}>
-                      <Download className="h-4 w-4 mr-2" />
-                      データエクスポート
-                    </Button>
-                    <Button variant="outline" className="border-red-600 text-red-500 hover:bg-red-950">
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      データリセット
-                    </Button>
-                  </div>
-                  <SpreadsheetSetup />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">システム情報</h3>
-                <div className="bg-zinc-700 p-4 rounded-md">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="text-zinc-400">バージョン:</div>
-                    <div>1.0.0</div>
-                    <div className="text-zinc-400">最終更新日:</div>
-                    <div>{new Date().toLocaleDateString()}</div>
-                    <div className="text-zinc-400">注文データ数:</div>
-                    <div>{orders.length}件</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
     </div>
   )
 }

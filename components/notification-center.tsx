@@ -53,7 +53,10 @@ export function NotificationCenter() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 bg-zinc-800 border-zinc-700 text-white p-0">
+      <PopoverContent
+        className="w-80 bg-zinc-800 border-zinc-700 text-white p-0"
+        aria-describedby="notification-description"
+      >
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <h3 className="font-medium text-amber-400">通知</h3>
           <div className="flex gap-1">
@@ -89,6 +92,9 @@ export function NotificationCenter() {
         </div>
 
         <ScrollArea className="max-h-[300px]">
+          <div id="notification-description" className="sr-only">
+            通知センター - 最新の通知を表示します
+          </div>
           {notifications.length === 0 ? (
             <div className="py-8 text-center text-zinc-400">通知はありません</div>
           ) : (
