@@ -1,32 +1,36 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useOrderStore } from "@/store/order-store"
 import { useNotificationStore, type Notification } from "@/store/notification-store"
 import { toast } from "@/components/ui/use-toast"
 
 export function TabSyncManager() {
-  const { orders, syncOrders } = useOrderStore()
+  const { orders, syncOrders, forceUpdate } = useOrderStore()
   const { notifications, unreadCount, syncNotifications } = useNotificationStore()
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSyncTimeRef = useRef<number>(Date.now())
 
-  // 注文データの同期
+  // 注文データの同期 - イベントベース
   useEffect(() => {
     const handleOrderStorageChange = (event: StorageEvent) => {
       if (event.key === "order-sync-event" && event.newValue) {
         try {
           const syncEvent = JSON.parse(event.newValue)
+          const currentTime = Date.now()
 
-          // 最新のデータを取得
-          const orderStorageData = localStorage.getItem("order-storage")
-          if (orderStorageData) {
-            const parsedData = JSON.parse(orderStorageData)
-            if (parsedData.state && Array.isArray(parsedData.state.orders)) {
-              syncOrders(parsedData.state.orders)
+          // 最後の同期から100ms以上経過している場合のみ処理（連続イベントの防止）
+          if (currentTime - lastSyncTimeRef.current > 100) {
+            lastSyncTimeRef.current = currentTime
 
-              // 新しい注文の場合、トーストで通知
-              if (syncEvent.type === "add-order") {
-                // 管理者向けの詳細なトースト通知
-                const order = syncEvent.order
+            // 最新のデータを取得
+            const success = forceUpdate()
+
+            // 新しい注文の場合、トースト通知
+            if (syncEvent.type === "add-order" && success) {
+              // 管理者向けの詳細なトースト通知
+              const order = syncEvent.order
+              if (order) {
                 const itemCount = order.items.reduce((total, item) => total + item.quantity, 0)
 
                 toast({
@@ -45,10 +49,22 @@ export function TabSyncManager() {
     }
 
     window.addEventListener("storage", handleOrderStorageChange)
+
+    // 定期的なポーリングを設定（3秒ごと）
+    syncIntervalRef.current = setInterval(() => {
+      forceUpdate()
+    }, 3000)
+
+    // 初回マウント時に強制同期
+    forceUpdate()
+
     return () => {
       window.removeEventListener("storage", handleOrderStorageChange)
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current)
+      }
     }
-  }, [syncOrders])
+  }, [forceUpdate])
 
   // 通知データの同期
   useEffect(() => {
@@ -74,6 +90,9 @@ export function TabSyncManager() {
                 try {
                   const audio = new Audio("/notification-sound.mp3")
                   audio.play().catch((err) => console.log("通知音の再生に失敗しました:", err))
+
+                  // 注文データも同時に更新
+                  forceUpdate()
                 } catch (error) {
                   console.error("通知音の再生中にエラーが発生しました:", error)
                 }
@@ -90,7 +109,7 @@ export function TabSyncManager() {
     return () => {
       window.removeEventListener("storage", handleNotificationStorageChange)
     }
-  }, [syncNotifications])
+  }, [syncNotifications, forceUpdate])
 
   // このコンポーネントは何もレンダリングしない
   return null

@@ -450,6 +450,16 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     // 通知を追加
     addNotification(createOrderNotification(newOrder))
 
+    // 同期を強制的に実行するためのイベントを発火
+    localStorage.setItem(
+      "order-sync-event",
+      JSON.stringify({
+        type: "add-order",
+        timestamp: Date.now(),
+        order: newOrder,
+      }),
+    )
+
     // スプレッドシートに注文データを送信
     sendOrderToSpreadsheet(newOrder)
       .then((success) => {

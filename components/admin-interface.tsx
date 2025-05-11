@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Download, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,10 +21,9 @@ import { SpreadsheetSetup } from "@/components/spreadsheet-setup"
 import { SimpleExport } from "@/components/simple-export"
 import { NotificationCenter } from "@/components/notification-center"
 import { useNotificationStore } from "@/store/notification-store"
-import { useEffect, useRef } from "react"
 
 export function AdminInterface() {
-  const { orders } = useOrderStore()
+  const { orders, forceUpdate } = useOrderStore()
   const [activeTab, setActiveTab] = useState("orders")
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
@@ -33,6 +32,8 @@ export function AdminInterface() {
   })
   const { notifications } = useNotificationStore()
   const previousNotificationsLength = useRef(notifications.length)
+  const ordersRef = useRef(orders)
+  const [lastRefreshed, setLastRefreshed] = useState(Date.now())
 
   // 今日の注文のみをフィルタリング
   const todayOrders = orders.filter((order) => {
@@ -184,6 +185,20 @@ export function AdminInterface() {
     setExportDialogOpen(false)
   }
 
+  // 手動更新ハンドラー
+  const handleManualRefresh = useCallback(() => {
+    const success = forceUpdate()
+    setLastRefreshed(Date.now())
+
+    if (success) {
+      toast({
+        title: "データを更新しました",
+        description: "最新の注文データが表示されています",
+        duration: 2000,
+      })
+    }
+  }, [forceUpdate])
+
   // 通知が来たときに注文履歴を自動的に更新
   useEffect(() => {
     // 通知の数が増えた場合（新しい通知が来た場合）
@@ -194,9 +209,11 @@ export function AdminInterface() {
       // 注文タイプの通知があるか確認
       const hasOrderNotification = newNotifications.some((notification) => notification.type === "order")
 
-      // 注文タイプの通知があれば、注文履歴タブに切り替え
+      // 注文タイプの通知があれば、注文履歴タブに切り替えて強制更新
       if (hasOrderNotification) {
         setActiveTab("orders")
+        forceUpdate()
+        setLastRefreshed(Date.now())
 
         // トーストで通知
         toast({
@@ -208,7 +225,36 @@ export function AdminInterface() {
 
     // 現在の通知数を保存
     previousNotificationsLength.current = notifications.length
-  }, [notifications, toast])
+  }, [notifications, forceUpdate])
+
+  // 注文データが変更されたときの処理
+  useEffect(() => {
+    // 注文データが変更された場合
+    if (orders !== ordersRef.current) {
+      ordersRef.current = orders
+      setLastRefreshed(Date.now())
+    }
+  }, [orders])
+
+  // タブが切り替わったときに強制更新
+  useEffect(() => {
+    if (activeTab === "orders") {
+      forceUpdate()
+      setLastRefreshed(Date.now())
+    }
+  }, [activeTab, forceUpdate])
+
+  // 定期的な更新（10秒ごと）
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (activeTab === "orders") {
+        forceUpdate()
+        setLastRefreshed(Date.now())
+      }
+    }, 10000)
+
+    return () => clearInterval(intervalId)
+  }, [activeTab, forceUpdate])
 
   return (
     <div className="w-full max-w-4xl">
@@ -288,9 +334,19 @@ export function AdminInterface() {
 
             <TabsContent value="orders">
               <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
-                <CardHeader className="border-b border-zinc-700">
-                  <CardTitle className="text-amber-400">注文履歴</CardTitle>
-                  <CardDescription className="text-zinc-400">全ての注文履歴を確認できます</CardDescription>
+                <CardHeader className="border-b border-zinc-700 flex flex-row justify-between items-center">
+                  <div>
+                    <CardTitle className="text-amber-400">注文履歴</CardTitle>
+                    <CardDescription className="text-zinc-400">
+                      全ての注文履歴を確認できます
+                      <br />
+                      <span className="text-xs">最終更新: {new Date(lastRefreshed).toLocaleTimeString()}</span>
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleManualRefresh} className="flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    更新
+                  </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px] p-4">
@@ -433,6 +489,8 @@ export function AdminInterface() {
                           <div>{new Date().toLocaleDateString()}</div>
                           <div className="text-zinc-400">注文データ数:</div>
                           <div>{orders.length}件</div>
+                          <div className="text-zinc-400">最終同期:</div>
+                          <div>{new Date(lastRefreshed).toLocaleTimeString()}</div>
                         </div>
                       </div>
                     </div>
