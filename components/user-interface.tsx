@@ -443,60 +443,96 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
 
     console.log("作成された注文:", newOrder)
 
-    // グローバルステートに注文を追加
-    addOrder(newOrder)
-    console.log("注文がグローバルステートに追加されました")
+    try {
+      // グローバルステートに注文を追加
+      addOrder(newOrder)
+      console.log("注文がグローバルステートに追加されました")
 
-    // 通知を追加
-    addNotification(createOrderNotification(newOrder))
+      // 通知を追加
+      addNotification(createOrderNotification(newOrder))
 
-    // 同期を強制的に実行するためのイベントを発火
-    localStorage.setItem(
-      "order-sync-event",
-      JSON.stringify({
-        type: "add-order",
-        timestamp: Date.now(),
-        order: newOrder,
-      }),
-    )
+      // 同期を強制的に実行するためのイベントを発火
+      localStorage.setItem(
+        "order-sync-event",
+        JSON.stringify({
+          type: "add-order",
+          timestamp: Date.now(),
+          order: newOrder,
+        }),
+      )
 
-    // スプレッドシートに注文データを送信
-    sendOrderToSpreadsheet(newOrder)
-      .then((success) => {
-        if (!success) {
-          toast({
-            title: "スプレッドシートへの送信に失敗しました",
-            description: "注文は保存されましたが、スプレッドシートには反映されていません。",
-            variant: "warning",
-          })
+      // 直接 localStorage に保存して確実に反映されるようにする
+      try {
+        const orderStorageData = localStorage.getItem("order-storage")
+        if (orderStorageData) {
+          const parsedData = JSON.parse(orderStorageData)
+          if (parsedData.state && Array.isArray(parsedData.state.orders)) {
+            // 既存の注文に新しい注文を追加
+            const updatedOrders = [...parsedData.state.orders, newOrder]
+
+            // 更新したデータを保存
+            const updatedData = {
+              ...parsedData,
+              state: {
+                ...parsedData.state,
+                orders: updatedOrders,
+                lastUpdated: Date.now(),
+              },
+            }
+
+            localStorage.setItem("order-storage", JSON.stringify(updatedData))
+            console.log("注文データを直接 localStorage に保存しました")
+          }
         }
-      })
-      .catch((err) => {
-        console.error("注文データの送信中にエラーが発生しました:", err)
-        toast({
-          title: "エラーが発生しました",
-          description: "注文データの送信中にエラーが発生しました。",
-          variant: "destructive",
+      } catch (error) {
+        console.error("localStorage への直接保存に失敗しました:", error)
+      }
+
+      // スプレッドシートに注文データを送信
+      sendOrderToSpreadsheet(newOrder)
+        .then((success) => {
+          if (!success) {
+            toast({
+              title: "スプレッドシートへの送信に失敗しました",
+              description: "注文は保存されましたが、スプレッドシートには反映されていません。",
+              variant: "warning",
+            })
+          }
         })
+        .catch((err) => {
+          console.error("注文データの送信中にエラーが発生しました:", err)
+          toast({
+            title: "エラーが発生しました",
+            description: "注文データの送信中にエラーが発生しました。",
+            variant: "destructive",
+          })
+        })
+
+      // カートをクリア
+      setCart([])
+
+      // 成功メッセージ
+      toast({
+        title: "注文が確定しました",
+        description: `注文番号: ${newOrder.id}、合計金額: ${newOrder.totalAmount}円`,
       })
 
-    // カートをクリア
-    setCart([])
-
-    // 成功メッセージ
-    toast({
-      title: "注文が確定しました",
-      description: `注文番号: ${newOrder.id}、合計金額: ${newOrder.totalAmount}円`,
-    })
-
-    // チャットに注文確認メッセージを追加
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        content: `ご注文ありがとうございます！注文番号: ${newOrder.id}、合計金額: ${newOrder.totalAmount}円です。まもなくお持ちします。`,
-      },
-    ])
+      // チャットに注文確認メッセージを追加
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `ご注文ありがとうございます！注文番号: ${newOrder.id}、合計金額: ${newOrder.totalAmount}円です。まもなくお持ちします。`,
+        },
+      ])
+    } catch (error) {
+      console.error("注文処理中にエラーが発生しました:", error)
+      toast({
+        title: "注文処理中にエラーが発生しました",
+        description: "もう一度お試しください。",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

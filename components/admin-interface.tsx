@@ -23,7 +23,7 @@ import { NotificationCenter } from "@/components/notification-center"
 import { useNotificationStore } from "@/store/notification-store"
 
 export function AdminInterface() {
-  const { orders, forceUpdate } = useOrderStore()
+  const { orders, forceUpdate, syncOrders } = useOrderStore()
   const [activeTab, setActiveTab] = useState("orders")
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
@@ -187,6 +187,38 @@ export function AdminInterface() {
 
   // 手動更新ハンドラー
   const handleManualRefresh = useCallback(() => {
+    console.log("手動更新を実行します")
+
+    // 直接 localStorage から読み込む
+    try {
+      const orderStorageData = localStorage.getItem("order-storage")
+      if (orderStorageData) {
+        const parsedData = JSON.parse(orderStorageData)
+        if (parsedData.state && Array.isArray(parsedData.state.orders)) {
+          console.log("localStorage から注文データを読み込みました:", parsedData.state.orders.length)
+
+          // 注文データを更新
+          syncOrders(parsedData.state.orders)
+          setLastRefreshed(Date.now())
+
+          toast({
+            title: "データを更新しました",
+            description: `${parsedData.state.orders.length}件の注文データを読み込みました`,
+            duration: 2000,
+          })
+
+          return true
+        } else {
+          console.warn("localStorage の注文データの形式が不正です")
+        }
+      } else {
+        console.warn("localStorage に注文データがありません")
+      }
+    } catch (error) {
+      console.error("手動更新中にエラーが発生しました:", error)
+    }
+
+    // 通常の forceUpdate も試す
     const success = forceUpdate()
     setLastRefreshed(Date.now())
 
@@ -196,8 +228,17 @@ export function AdminInterface() {
         description: "最新の注文データが表示されています",
         duration: 2000,
       })
+      return true
+    } else {
+      toast({
+        title: "データの更新に失敗しました",
+        description: "注文データが見つからないか、形式が不正です",
+        variant: "destructive",
+        duration: 3000,
+      })
+      return false
     }
-  }, [forceUpdate])
+  }, [forceUpdate, syncOrders])
 
   // 通知が来たときに注文履歴を自動的に更新
   useEffect(() => {
@@ -351,7 +392,48 @@ export function AdminInterface() {
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px] p-4">
                     {orders.length === 0 ? (
-                      <div className="py-6 text-center text-zinc-400">注文履歴がありません</div>
+                      <div className="py-6 text-center space-y-4">
+                        <p className="text-zinc-400">注文履歴がありません</p>
+                        <div className="bg-zinc-700 p-4 rounded-md text-xs text-zinc-400 text-left">
+                          <p className="font-bold mb-2">デバッグ情報:</p>
+                          <p>最終更新: {new Date(lastRefreshed).toLocaleTimeString()}</p>
+                          <p>
+                            localStorage 確認:{" "}
+                            {typeof window !== "undefined" && localStorage.getItem("order-storage")
+                              ? "データあり"
+                              : "データなし"}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 w-full"
+                            onClick={() => {
+                              try {
+                                const data = localStorage.getItem("order-storage")
+                                if (data) {
+                                  const parsed = JSON.parse(data)
+                                  console.log("localStorage の注文データ:", parsed)
+                                  toast({
+                                    title: "localStorage データを確認",
+                                    description: `${parsed.state?.orders?.length || 0}件の注文データがあります`,
+                                  })
+                                } else {
+                                  console.log("localStorage に注文データがありません")
+                                  toast({
+                                    title: "localStorage データを確認",
+                                    description: "注文データがありません",
+                                    variant: "destructive",
+                                  })
+                                }
+                              } catch (error) {
+                                console.error("localStorage データの確認中にエラー:", error)
+                              }
+                            }}
+                          >
+                            localStorage データを確認
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
                       <div className="space-y-4">
                         {orders
