@@ -274,35 +274,37 @@ export function AdminInterface() {
                 <div className="py-6 text-center text-zinc-400">注文履歴がありません</div>
               ) : (
                 <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div key={order.id} className="bg-zinc-700 rounded-md p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <div>
-                          <div className="font-bold text-amber-400">{order.id}</div>
-                          <div className="text-sm text-zinc-400">
-                            {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
+                  {orders
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .map((order) => (
+                      <div key={order.id} className="bg-zinc-700 rounded-md p-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <div>
+                            <div className="font-bold text-amber-400">{order.id}</div>
+                            <div className="text-sm text-zinc-400">
+                              {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
+                            </div>
                           </div>
+                          <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                            {order.status}
+                          </Badge>
                         </div>
-                        <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
-                          {order.status}
-                        </Badge>
+                        <div className="space-y-2 mt-3">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span>
+                                {item.name} × {item.quantity}
+                              </span>
+                              <span>{item.price}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="border-t border-zinc-600 mt-3 pt-3 flex justify-between font-bold">
+                          <span>合計</span>
+                          <span>{order.totalAmount}円</span>
+                        </div>
                       </div>
-                      <div className="space-y-2 mt-3">
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span>
-                              {item.name} × {item.quantity}
-                            </span>
-                            <span>{item.price}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="border-t border-zinc-600 mt-3 pt-3 flex justify-between font-bold">
-                        <span>合計</span>
-                        <span>{order.totalAmount}円</span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </ScrollArea>

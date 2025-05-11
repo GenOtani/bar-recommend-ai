@@ -74,62 +74,72 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
 
   useEffect(() => {
     // Web Speech API のサポートチェック
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      console.error("このブラウザは音声認識をサポートしていません。")
-      return
-    }
-
-    // @ts-ignore
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    recognitionRef.current = new SpeechRecognition()
-    recognitionRef.current.lang = "ja-JP"
-    recognitionRef.current.continuous = false
-    recognitionRef.current.interimResults = false
-
-    recognitionRef.current.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript
-      handleUserInput(transcript)
-    }
-
-    recognitionRef.current.onerror = (event: any) => {
-      console.error("音声認識エラー:", event.error)
-      setIsListening(false)
-    }
-
-    recognitionRef.current.onend = () => {
-      setIsListening(false)
-    }
-
-    // 音声合成の初期化
-    synthesisRef.current = new SpeechSynthesisUtterance()
-    synthesisRef.current.lang = "ja-JP"
-    synthesisRef.current.rate = 0.9 // 少し遅めに設定（0.1〜10の範囲、デフォルトは1）
-    synthesisRef.current.pitch = 1.0 // 音の高さ（0〜2の範囲、デフォルトは1）
-
-    // 利用可能な音声から日本語の音声を選択
-    window.speechSynthesis.onvoiceschanged = () => {
-      const voices = window.speechSynthesis.getVoices()
-      const japaneseVoices = voices.filter((voice) => voice.lang.includes("ja") || voice.name.includes("Japanese"))
-
-      if (japaneseVoices.length > 0) {
-        // 日本語の音声が見つかった場合は最初のものを使用
-        synthesisRef.current!.voice = japaneseVoices[0]
-        console.log("日本語の音声を設定しました:", japaneseVoices[0].name)
-      } else {
-        console.warn("日本語の音声が見つかりませんでした。デフォルトの音声を使用します。")
+    if (typeof window !== "undefined") {
+      if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+        console.error("このブラウザは音声認識をサポートしていません。")
+        return
       }
-    }
 
-    synthesisRef.current.onend = () => {
-      setIsSpeaking(false)
-    }
+      // @ts-ignore
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      recognitionRef.current = new SpeechRecognition()
+      recognitionRef.current.lang = "ja-JP"
+      recognitionRef.current.continuous = false
+      recognitionRef.current.interimResults = false
 
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort()
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript
+        handleUserInput(transcript)
       }
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel()
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("音声認識エラー:", event.error)
+        setIsListening(false)
+      }
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false)
+      }
+
+      // 音声合成の初期化
+      if (typeof window !== "undefined") {
+        synthesisRef.current = new SpeechSynthesisUtterance()
+        synthesisRef.current.lang = "ja-JP"
+        synthesisRef.current.rate = 0.9 // 少し遅めに設定（0.1〜10の範囲、デフォルトは1）
+        synthesisRef.current.pitch = 1.0 // 音の高さ（0〜2の範囲、デフォルトは1）
+
+        // 利用可能な音声から日本語の音声を選択
+        if (window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = () => {
+            const voices = window.speechSynthesis.getVoices()
+            const japaneseVoices = voices.filter(
+              (voice) => voice.lang.includes("ja") || voice.name.includes("Japanese"),
+            )
+
+            if (japaneseVoices.length > 0 && synthesisRef.current) {
+              // 日本語の音声が見つかった場合は最初のものを使用
+              synthesisRef.current.voice = japaneseVoices[0]
+              console.log("日本語の音声を設定しました:", japaneseVoices[0].name)
+            } else {
+              console.warn("日本語の音声が見つかりませんでした。デフォルトの音声を使用します。")
+            }
+          }
+        }
+
+        if (synthesisRef.current) {
+          synthesisRef.current.onend = () => {
+            setIsSpeaking(false)
+          }
+        }
+
+        return () => {
+          if (recognitionRef.current) {
+            recognitionRef.current.abort()
+          }
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel()
+          }
+        }
       }
     }
   }, [])
