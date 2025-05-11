@@ -412,7 +412,15 @@ export function AdminInterface() {
                     <div className="flex justify-between">
                       <span className="text-zinc-400">現在のステータス:</span>
                       <span>
-                        <Badge className={selectedOrder.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                        <Badge
+                          className={
+                            selectedOrder.status === "提供済み"
+                              ? "bg-green-600"
+                              : selectedOrder.status === "キャンセル"
+                                ? "bg-red-600"
+                                : "bg-amber-500"
+                          }
+                        >
                           {selectedOrder.status}
                         </Badge>
                       </span>
@@ -432,10 +440,20 @@ export function AdminInterface() {
               キャンセル
             </Button>
             <Button
-              className={newStatus === "提供済み" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}
+              className={
+                newStatus === "提供済み"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : newStatus === "キャンセル"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-amber-500 hover:bg-amber-600"
+              }
               onClick={handleStatusChange}
             >
-              {newStatus === "提供済み" ? <Check className="h-4 w-4 mr-2" /> : <X className="h-4 w-4 mr-2" />}
+              {newStatus === "提供済み" ? (
+                <Check className="h-4 w-4 mr-2" />
+              ) : newStatus === "キャンセル" ? (
+                <X className="h-4 w-4 mr-2" />
+              ) : null}
               {newStatus}に変更
             </Button>
           </DialogFooter>
@@ -574,7 +592,15 @@ export function AdminInterface() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                                    <Badge
+                                      className={
+                                        order.status === "提供済み"
+                                          ? "bg-green-600"
+                                          : order.status === "キャンセル"
+                                            ? "bg-red-600"
+                                            : "bg-amber-500"
+                                      }
+                                    >
                                       {order.status}
                                     </Badge>
                                     <DropdownMenu>
@@ -587,6 +613,13 @@ export function AdminInterface() {
                                         align="end"
                                         className="bg-zinc-800 border-zinc-700 text-white"
                                       >
+                                        <DropdownMenuItem
+                                          className="text-amber-400 focus:text-amber-400 focus:bg-zinc-700"
+                                          onClick={() => openStatusDialog(order, "未提供")}
+                                        >
+                                          <span className="h-4 w-4 mr-2 flex items-center justify-center">⏱️</span>
+                                          未提供にする
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem
                                           className="text-green-400 focus:text-green-400 focus:bg-zinc-700"
                                           onClick={() => openStatusDialog(order, "提供済み")}

@@ -10,7 +10,7 @@ export type Order = {
   id: string
   items: CartItem[]
   totalAmount: number
-  status: "提供済み" | "キャンセル"
+  status: "未提供" | "提供済み" | "キャンセル"
   tableNumber: string
   timestamp: Date
 }

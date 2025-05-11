@@ -436,7 +436,7 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
       id: `order-${Date.now()}`,
       items: [...cart],
       totalAmount: cartTotal,
-      status: "提供済み",
+      status: "未提供",
       tableNumber,
       timestamp: new Date(),
     }
