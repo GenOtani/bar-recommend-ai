@@ -3,7 +3,7 @@
 import type React from "react"
 import { DialogFooter } from "@/components/ui/dialog"
 import { useState, useEffect, useRef } from "react"
-import { Mic, MicOff, Volume2, VolumeX, ShoppingCart, Plus, Minus, Trash2, Loader2 } from "lucide-react"
+import { Mic, MicOff, Volume2, VolumeX, ShoppingCart, Plus, Minus, Trash2, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -49,9 +49,10 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
   const [selectedQuantity, setSelectedQuantity] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [inputText, setInputText] = useState("")
+  const [lastRefreshed, setLastRefreshed] = useState(Date.now())
 
   // グローバルステートから注文履歴を取得
-  const { orders, addOrder } = useOrderStore()
+  const { orders, addOrder, forceUpdate } = useOrderStore()
 
   // 通知ストアから関数を取得
   const { addNotification } = useNotificationStore()
@@ -147,6 +148,39 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // タブが切り替わったときに注文データを更新
+  useEffect(() => {
+    if (activeTab === "history") {
+      handleRefreshOrders()
+    }
+  }, [activeTab])
+
+  // 定期的に注文データを更新（15秒ごと）
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (activeTab === "history") {
+        handleRefreshOrders(false) // 静かに更新（トースト通知なし）
+      }
+    }, 15000)
+
+    return () => clearInterval(intervalId)
+  }, [activeTab])
+
+  // 注文データを更新する関数
+  const handleRefreshOrders = (showToast = true) => {
+    const success = forceUpdate()
+    setLastRefreshed(Date.now())
+
+    if (success && showToast) {
+      toast({
+        title: "注文履歴を更新しました",
+        description: "最新の注文状況が表示されています",
+        duration: 2000,
+      })
+    }
+    return success
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -529,6 +563,9 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
           content: `ご注文ありがとうございます！注文番号: ${newOrder.id}、合計金額: ${newOrder.totalAmount}円です。まもなくお持ちします。`,
         },
       ])
+
+      // 注文履歴タブに切り替え
+      setActiveTab("history")
     } catch (error) {
       console.error("注文処理中にエラーが発生しました:", error)
       toast({
@@ -536,6 +573,19 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
         description: "もう一度お試しください。",
         variant: "destructive",
       })
+    }
+  }
+
+  // ステータスに応じたバッジの色を返す関数
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "提供済み":
+        return "bg-green-600"
+      case "キャンセル":
+        return "bg-red-600"
+      case "未提供":
+      default:
+        return "bg-amber-500"
     }
   }
 
@@ -934,11 +984,24 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
 
         <TabsContent value="history">
           <Card className="w-full bg-zinc-800 border-zinc-700 mb-4">
-            <CardHeader className="border-b border-zinc-700">
-              <CardTitle className="text-amber-400">あなたの注文履歴</CardTitle>
-              <CardDescription className="text-zinc-400">
-                テーブル {tableNumber} の注文履歴を表示しています
-              </CardDescription>
+            <CardHeader className="border-b border-zinc-700 flex flex-row justify-between items-center">
+              <div>
+                <CardTitle className="text-amber-400">あなたの注文履歴</CardTitle>
+                <CardDescription className="text-zinc-400">
+                  テーブル {tableNumber} の注文履歴を表示しています
+                  <br />
+                  <span className="text-xs">最終更新: {new Date(lastRefreshed).toLocaleTimeString()}</span>
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRefreshOrders()}
+                className="flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" />
+                更新
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[400px] p-4">
@@ -956,9 +1019,7 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
                               <div className="font-bold text-amber-400">{order.id}</div>
                               <div className="text-sm text-zinc-400">{new Date(order.timestamp).toLocaleString()}</div>
                             </div>
-                            <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
-                              {order.status}
-                            </Badge>
+                            <Badge className={getStatusBadgeClass(order.status)}>{order.status}</Badge>
                           </div>
                           <div className="space-y-2 mt-3">
                             {order.items.map((item, idx) => (

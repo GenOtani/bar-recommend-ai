@@ -6,7 +6,7 @@ interface OrderState {
   orders: Order[]
   lastUpdated: number
   addOrder: (order: Order) => void
-  updateOrderStatus: (orderId: string, status: "提供済み" | "キャンセル") => void
+  updateOrderStatus: (orderId: string, status: "未提供" | "提供済み" | "キャンセル") => void
   clearOrders: () => void
   syncOrders: (orders: Order[]) => void
   getOrders: () => Order[]
@@ -69,9 +69,24 @@ export const useOrderStore = create<OrderState>()(
         })
       },
 
-      updateOrderStatus: (orderId, status) =>
+      updateOrderStatus: (orderId, status) => {
+        logDebug(`注文ステータス更新開始: ${orderId} -> ${status}`)
+
         set((state) => {
-          const updatedOrders = state.orders.map((order) => (order.id === orderId ? { ...order, status } : order))
+          // 対象の注文を見つける
+          const orderIndex = state.orders.findIndex((order) => order.id === orderId)
+
+          if (orderIndex === -1) {
+            logDebug(`注文が見つかりません: ${orderId}`)
+            return state
+          }
+
+          // 注文のコピーを作成して更新
+          const updatedOrder = { ...state.orders[orderIndex], status }
+          const updatedOrders = [...state.orders]
+          updatedOrders[orderIndex] = updatedOrder
+
+          logDebug(`注文ステータスを更新しました: ${orderId} -> ${status}`)
 
           // 同期イベントを発火（非同期で）
           setTimeout(() => {
@@ -83,15 +98,18 @@ export const useOrderStore = create<OrderState>()(
                   timestamp: Date.now(),
                   orderId,
                   status,
+                  order: updatedOrder,
                 }),
               )
+              logDebug(`同期イベント発火: update-status ${orderId} -> ${status}`)
             } catch (error) {
               console.error("同期イベントの保存に失敗しました:", error)
             }
           }, 100)
 
           return { orders: updatedOrders, lastUpdated: Date.now() }
-        }),
+        })
+      },
 
       clearOrders: () => {
         set({ orders: [], lastUpdated: Date.now() })
@@ -149,6 +167,21 @@ export const useOrderStore = create<OrderState>()(
 
               if (hasNewOrders) {
                 logDebug("新しい注文が見つかりました")
+                set({
+                  orders: newOrders,
+                  lastUpdated: Date.now(),
+                })
+                return true
+              }
+
+              // ステータスの変更を確認
+              const hasStatusChanges = newOrders.some((newOrder) => {
+                const currentOrder = currentOrders.find((o) => o.id === newOrder.id)
+                return currentOrder && currentOrder.status !== newOrder.status
+              })
+
+              if (hasStatusChanges) {
+                logDebug("注文ステータスの変更が見つかりました")
                 set({
                   orders: newOrders,
                   lastUpdated: Date.now(),

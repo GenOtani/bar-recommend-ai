@@ -45,7 +45,7 @@ export function TabSyncManager() {
             lastEventType: eventType,
           }))
 
-          logDebug(`同期イベント受信: ${eventType}`)
+          logDebug(`同期イベント受信: ${eventType}`, syncEvent)
 
           // 最後の同期から100ms以上経過している場合のみ処理（連続イベントの防止）
           if (currentTime - lastSyncTimeRef.current > 100) {
@@ -75,6 +75,16 @@ export function TabSyncManager() {
                     duration: 5000, // 通知を長めに表示
                   })
                 }
+              }
+
+              // ステータス変更の場合、トースト通知
+              if (syncEvent.type === "update-status") {
+                toast({
+                  title: "注文ステータスが更新されました",
+                  description: `注文 ${syncEvent.orderId} のステータスが「${syncEvent.status}」に変更されました`,
+                  variant: "default",
+                  duration: 3000,
+                })
               }
             } else {
               logDebug(`同期に変更なし: ${eventType}`)
