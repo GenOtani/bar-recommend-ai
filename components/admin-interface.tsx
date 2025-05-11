@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Download, RefreshCw } from "lucide-react"
+import { Download, RefreshCw, Check, X, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,17 +15,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "@/components/ui/use-toast"
 import { useOrderStore } from "@/store/order-store"
 import { SpreadsheetSetup } from "@/components/spreadsheet-setup"
 import { SimpleExport } from "@/components/simple-export"
 import { NotificationCenter } from "@/components/notification-center"
 import { useNotificationStore } from "@/store/notification-store"
+import type { Order } from "@/types/order-types"
 
 export function AdminInterface() {
-  const { orders, forceUpdate, syncOrders } = useOrderStore()
+  const { orders, forceUpdate, syncOrders, updateOrderStatus } = useOrderStore()
   const [activeTab, setActiveTab] = useState("orders")
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [newStatus, setNewStatus] = useState<"提供済み" | "キャンセル">("提供済み")
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
     start: new Date(new Date().setHours(0, 0, 0, 0)),
     end: new Date(new Date().setHours(23, 59, 59, 999)),
@@ -254,6 +259,32 @@ export function AdminInterface() {
     }
   }, [forceUpdate, syncOrders])
 
+  // 注文ステータス変更ダイアログを開く
+  const openStatusDialog = (order: Order, status: "提供済み" | "キャンセル") => {
+    setSelectedOrder(order)
+    setNewStatus(status)
+    setStatusDialogOpen(true)
+  }
+
+  // 注文ステータスを変更する
+  const handleStatusChange = () => {
+    if (!selectedOrder) return
+
+    // ステータスを更新
+    updateOrderStatus(selectedOrder.id, newStatus)
+
+    // 成功メッセージ
+    toast({
+      title: "ステータスを更新しました",
+      description: `注文 ${selectedOrder.id} のステータスを「${newStatus}」に変更しました`,
+      duration: 3000,
+    })
+
+    // ダイアログを閉じる
+    setStatusDialogOpen(false)
+    setSelectedOrder(null)
+  }
+
   // 通知が来たときに注文履歴を自動的に更新
   useEffect(() => {
     // 通知の数が増えた場合（新しい通知が来た場合）
@@ -342,6 +373,70 @@ export function AdminInterface() {
             <Button className="bg-amber-600 hover:bg-amber-700" onClick={downloadCSV}>
               <Download className="h-4 w-4 mr-2" />
               CSVをダウンロード
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ステータス変更ダイアログ */}
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent className="bg-zinc-800 border-zinc-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-amber-400">注文ステータスの変更</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              注文のステータスを「{newStatus}」に変更します。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedOrder && (
+              <div className="space-y-4">
+                <div className="bg-zinc-700 p-3 rounded-md">
+                  <div className="font-medium text-amber-400 mb-1">注文情報</div>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">注文ID:</span>
+                      <span>{selectedOrder.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">テーブル番号:</span>
+                      <span>{selectedOrder.tableNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">注文時間:</span>
+                      <span>{new Date(selectedOrder.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">合計金額:</span>
+                      <span>{selectedOrder.totalAmount}円</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-400">現在のステータス:</span>
+                      <span>
+                        <Badge className={selectedOrder.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                          {selectedOrder.status}
+                        </Badge>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-amber-900/30 p-3 rounded-md border border-amber-800">
+                  <p className="text-sm text-amber-200">
+                    注文のステータスを「{newStatus}」に変更します。この操作は元に戻せません。
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+              キャンセル
+            </Button>
+            <Button
+              className={newStatus === "提供済み" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}
+              onClick={handleStatusChange}
+            >
+              {newStatus === "提供済み" ? <Check className="h-4 w-4 mr-2" /> : <X className="h-4 w-4 mr-2" />}
+              {newStatus}に変更
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -478,9 +573,37 @@ export function AdminInterface() {
                                       {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
                                     </div>
                                   </div>
-                                  <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
-                                    {order.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                                      {order.status}
+                                    </Badge>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        align="end"
+                                        className="bg-zinc-800 border-zinc-700 text-white"
+                                      >
+                                        <DropdownMenuItem
+                                          className="text-green-400 focus:text-green-400 focus:bg-zinc-700"
+                                          onClick={() => openStatusDialog(order, "提供済み")}
+                                        >
+                                          <Check className="h-4 w-4 mr-2" />
+                                          提供済みにする
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          className="text-red-400 focus:text-red-400 focus:bg-zinc-700"
+                                          onClick={() => openStatusDialog(order, "キャンセル")}
+                                        >
+                                          <X className="h-4 w-4 mr-2" />
+                                          キャンセルにする
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                 </div>
                                 <div className="space-y-2 mt-3">
                                   {order.items.map((item, idx) => (
