@@ -15,7 +15,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { UserInterface } from "@/components/user-interface"
 import { useRouter } from "next/navigation"
 
 export default function CocktailChatbot() {
@@ -24,6 +23,7 @@ export default function CocktailChatbot() {
   // テーブル番号入力ダイアログの状態
   const [tableInputDialogOpen, setTableInputDialogOpen] = useState(true)
   const [tableNumber, setTableNumber] = useState("")
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   useEffect(() => {
     // コンポーネントマウント時にテーブル番号ダイアログを表示
@@ -31,6 +31,24 @@ export default function CocktailChatbot() {
       setTableInputDialogOpen(true)
     }
   }, [tableNumber])
+
+  // テーブル番号確定時の処理
+  const handleTableConfirm = () => {
+    if (tableNumber) {
+      setIsRedirecting(true)
+
+      // テーブル番号が選択されたら、対応するURLにリダイレクト
+      router.push(`/table/${tableNumber}`)
+
+      // ダイアログを閉じる
+      setTableInputDialogOpen(false)
+    } else {
+      toast({
+        title: "テーブル番号を選択してください",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-900 to-zinc-950 text-white p-4 flex flex-col items-center">
@@ -88,30 +106,34 @@ export default function CocktailChatbot() {
           <DialogFooter>
             <Button
               className="bg-amber-600 hover:bg-amber-700"
-              onClick={() => {
-                if (tableNumber) {
-                  setTableInputDialogOpen(false)
-                  toast({
-                    title: "テーブル番号を設定しました",
-                    description: `テーブル番号: ${tableNumber}`,
-                  })
-                } else {
-                  toast({
-                    title: "テーブル番号を選択してください",
-                    variant: "destructive",
-                  })
-                }
-              }}
-              disabled={!tableNumber}
+              onClick={handleTableConfirm}
+              disabled={!tableNumber || isRedirecting}
             >
-              確定
+              {isRedirecting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  移動中...
+                </>
+              ) : (
+                "確定"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ユーザーインターフェース */}
-      <UserInterface tableNumber={tableNumber} />
+      {/* メインコンテンツ */}
+      <div className="w-full max-w-2xl text-center">
+        <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8 shadow-lg">
+          <h2 className="text-2xl font-bold text-amber-400 mb-4">ようこそ！</h2>
+          <p className="text-zinc-300 mb-6">
+            バーテンダーAIへようこそ。テーブル番号を選択して、カクテル注文やチャットをお楽しみください。
+          </p>
+          <Button className="bg-amber-600 hover:bg-amber-700 w-full" onClick={() => setTableInputDialogOpen(true)}>
+            テーブル番号を選択する
+          </Button>
+        </div>
+      </div>
 
       <footer className="text-center text-zinc-500 text-sm mt-4">
         <p>カクテルの種類や好みを話しかけてみてください</p>

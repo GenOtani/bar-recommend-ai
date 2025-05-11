@@ -167,6 +167,14 @@ export function UserInterface({ tableNumber }: UserInterfaceProps) {
     return () => clearInterval(intervalId)
   }, [activeTab])
 
+  // テーブル番号変更時の処理を追加
+  useEffect(() => {
+    // テーブル番号が変更された場合、注文履歴を更新
+    if (tableNumber) {
+      handleRefreshOrders(false) // 静かに更新（トースト通知なし）
+    }
+  }, [tableNumber])
+
   // 注文データを更新する関数
   const handleRefreshOrders = (showToast = true) => {
     const success = forceUpdate()
