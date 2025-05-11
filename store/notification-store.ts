@@ -19,6 +19,7 @@ interface NotificationState {
   markAsRead: (id: string) => void
   markAllAsRead: () => void
   clearNotifications: () => void
+  syncNotifications: (notifications: Notification[], unreadCount: number) => void
 }
 
 export const useNotificationStore = create<NotificationState>()(
@@ -33,10 +34,24 @@ export const useNotificationStore = create<NotificationState>()(
           read: false,
           ...notification,
         }
-        set((state) => ({
-          notifications: [newNotification, ...state.notifications],
-          unreadCount: state.unreadCount + 1,
-        }))
+        set((state) => {
+          const newState = {
+            notifications: [newNotification, ...state.notifications],
+            unreadCount: state.unreadCount + 1,
+          }
+
+          // localStorageに直接保存して他のタブに通知
+          localStorage.setItem(
+            "notification-sync-event",
+            JSON.stringify({
+              type: "add-notification",
+              timestamp: new Date().getTime(),
+              notification: newNotification,
+            }),
+          )
+
+          return newState
+        })
       },
       markAsRead: (id) => {
         set((state) => {
@@ -44,18 +59,52 @@ export const useNotificationStore = create<NotificationState>()(
             notification.id === id ? { ...notification, read: true } : notification,
           )
           const unreadCount = updatedNotifications.filter((notification) => !notification.read).length
+
+          // localStorageに直接保存して他のタブに通知
+          localStorage.setItem(
+            "notification-sync-event",
+            JSON.stringify({
+              type: "mark-as-read",
+              timestamp: new Date().getTime(),
+              id,
+            }),
+          )
+
           return { notifications: updatedNotifications, unreadCount }
         })
       },
       markAllAsRead: () => {
-        set((state) => ({
-          notifications: state.notifications.map((notification) => ({ ...notification, read: true })),
-          unreadCount: 0,
-        }))
+        set((state) => {
+          const updatedState = {
+            notifications: state.notifications.map((notification) => ({ ...notification, read: true })),
+            unreadCount: 0,
+          }
+
+          // localStorageに直接保存して他のタブに通知
+          localStorage.setItem(
+            "notification-sync-event",
+            JSON.stringify({
+              type: "mark-all-as-read",
+              timestamp: new Date().getTime(),
+            }),
+          )
+
+          return updatedState
+        })
       },
       clearNotifications: () => {
         set({ notifications: [], unreadCount: 0 })
+
+        // localStorageに直接保存して他のタブに通知
+        localStorage.setItem(
+          "notification-sync-event",
+          JSON.stringify({
+            type: "clear-notifications",
+            timestamp: new Date().getTime(),
+          }),
+        )
       },
+      syncNotifications: (notifications, unreadCount) => set({ notifications, unreadCount }),
     }),
     {
       name: "notification-storage",
