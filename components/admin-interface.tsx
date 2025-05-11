@@ -20,6 +20,8 @@ import { useOrderStore } from "@/store/order-store"
 import { SpreadsheetSetup } from "@/components/spreadsheet-setup"
 import { SimpleExport } from "@/components/simple-export"
 import { NotificationCenter } from "@/components/notification-center"
+import { useNotificationStore } from "@/store/notification-store"
+import { useEffect, useRef } from "react"
 
 export function AdminInterface() {
   const { orders } = useOrderStore()
@@ -29,6 +31,8 @@ export function AdminInterface() {
     start: new Date(new Date().setHours(0, 0, 0, 0)),
     end: new Date(new Date().setHours(23, 59, 59, 999)),
   })
+  const { notifications } = useNotificationStore()
+  const previousNotificationsLength = useRef(notifications.length)
 
   // 今日の注文のみをフィルタリング
   const todayOrders = orders.filter((order) => {
@@ -180,6 +184,32 @@ export function AdminInterface() {
     setExportDialogOpen(false)
   }
 
+  // 通知が来たときに注文履歴を自動的に更新
+  useEffect(() => {
+    // 通知の数が増えた場合（新しい通知が来た場合）
+    if (notifications.length > previousNotificationsLength.current) {
+      // 新しい通知を取得
+      const newNotifications = notifications.slice(0, notifications.length - previousNotificationsLength.current)
+
+      // 注文タイプの通知があるか確認
+      const hasOrderNotification = newNotifications.some((notification) => notification.type === "order")
+
+      // 注文タイプの通知があれば、注文履歴タブに切り替え
+      if (hasOrderNotification) {
+        setActiveTab("orders")
+
+        // トーストで通知
+        toast({
+          title: "新しい注文が追加されました",
+          description: "注文履歴が自動的に更新されました。",
+        })
+      }
+    }
+
+    // 現在の通知数を保存
+    previousNotificationsLength.current = notifications.length
+  }, [notifications, toast])
+
   return (
     <div className="w-full max-w-4xl">
       {/* エクスポートダイアログ */}
@@ -270,35 +300,53 @@ export function AdminInterface() {
                       <div className="space-y-4">
                         {orders
                           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                          .map((order) => (
-                            <div key={order.id} className="bg-zinc-700 rounded-md p-4">
-                              <div className="flex justify-between items-center mb-2">
-                                <div>
-                                  <div className="font-bold text-amber-400">{order.id}</div>
-                                  <div className="text-sm text-zinc-400">
-                                    {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
+                          .map((order, index) => {
+                            // 最新の注文かどうかを判定（上位3件を「新着」とする）
+                            const isNew =
+                              index < 3 && new Date().getTime() - new Date(order.timestamp).getTime() < 3600000 // 1時間以内
+
+                            return (
+                              <div
+                                key={order.id}
+                                className={`bg-zinc-700 rounded-md p-4 transition-all ${
+                                  isNew ? "border-l-4 border-amber-500 animate-pulse" : ""
+                                }`}
+                              >
+                                <div className="flex justify-between items-center mb-2">
+                                  <div>
+                                    <div className="font-bold text-amber-400">
+                                      {order.id}
+                                      {isNew && (
+                                        <span className="ml-2 text-xs bg-amber-600 text-white px-2 py-0.5 rounded-full">
+                                          新着
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-zinc-400">
+                                      {new Date(order.timestamp).toLocaleString()} - テーブル {order.tableNumber}
+                                    </div>
                                   </div>
+                                  <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
+                                    {order.status}
+                                  </Badge>
                                 </div>
-                                <Badge className={order.status === "提供済み" ? "bg-green-600" : "bg-red-600"}>
-                                  {order.status}
-                                </Badge>
+                                <div className="space-y-2 mt-3">
+                                  {order.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between text-sm">
+                                      <span>
+                                        {item.name} × {item.quantity}
+                                      </span>
+                                      <span>{item.price}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="border-t border-zinc-600 mt-3 pt-3 flex justify-between font-bold">
+                                  <span>合計</span>
+                                  <span>{order.totalAmount}円</span>
+                                </div>
                               </div>
-                              <div className="space-y-2 mt-3">
-                                {order.items.map((item, idx) => (
-                                  <div key={idx} className="flex justify-between text-sm">
-                                    <span>
-                                      {item.name} × {item.quantity}
-                                    </span>
-                                    <span>{item.price}</span>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="border-t border-zinc-600 mt-3 pt-3 flex justify-between font-bold">
-                                <span>合計</span>
-                                <span>{order.totalAmount}円</span>
-                              </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                       </div>
                     )}
                   </ScrollArea>

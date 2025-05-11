@@ -25,9 +25,15 @@ export function TabSyncManager() {
 
               // 新しい注文の場合、トーストで通知
               if (syncEvent.type === "add-order") {
+                // 管理者向けの詳細なトースト通知
+                const order = syncEvent.order
+                const itemCount = order.items.reduce((total, item) => total + item.quantity, 0)
+
                 toast({
-                  title: "新しい注文が入りました",
-                  description: `テーブル${syncEvent.order.tableNumber}から${syncEvent.order.items.length}点の注文`,
+                  title: `新規注文: テーブル${order.tableNumber}`,
+                  description: `${itemCount}点の注文 - 合計: ${order.totalAmount}円`,
+                  variant: "default",
+                  duration: 5000, // 通知を長めに表示
                 })
               }
             }
