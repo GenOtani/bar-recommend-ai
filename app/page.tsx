@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,16 +21,9 @@ export default function CocktailChatbot() {
   const router = useRouter()
 
   // テーブル番号入力ダイアログの状態
-  const [tableInputDialogOpen, setTableInputDialogOpen] = useState(true)
+  const [tableInputDialogOpen, setTableInputDialogOpen] = useState(false)
   const [tableNumber, setTableNumber] = useState("")
   const [isRedirecting, setIsRedirecting] = useState(false)
-
-  useEffect(() => {
-    // コンポーネントマウント時にテーブル番号ダイアログを表示
-    if (!tableNumber) {
-      setTableInputDialogOpen(true)
-    }
-  }, [tableNumber])
 
   // テーブル番号確定時の処理
   const handleTableConfirm = () => {
@@ -73,8 +66,8 @@ export default function CocktailChatbot() {
       <Dialog
         open={tableInputDialogOpen}
         onOpenChange={(open) => {
-          // テーブル番号が選択されていない場合はダイアログを閉じられないようにする
-          if (!tableNumber && !open) {
+          // リダイレクト中はダイアログを閉じられないようにする
+          if (isRedirecting && !open) {
             return
           }
           setTableInputDialogOpen(open)
@@ -129,13 +122,26 @@ export default function CocktailChatbot() {
           <p className="text-zinc-300 mb-6">
             バーテンダーAIへようこそ。テーブル番号を選択して、カクテル注文やチャットをお楽しみください。
           </p>
-          <Button className="bg-amber-600 hover:bg-amber-700 w-full" onClick={() => setTableInputDialogOpen(true)}>
+          <Button
+            className="bg-amber-600 hover:bg-amber-700 w-full text-lg py-6"
+            onClick={() => setTableInputDialogOpen(true)}
+          >
             テーブル番号を選択する
           </Button>
         </div>
+
+        <div className="mt-8 bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-6">
+          <h3 className="text-xl font-medium text-amber-400 mb-3">ご利用方法</h3>
+          <ol className="text-left text-zinc-300 space-y-2 list-decimal list-inside">
+            <li>上のボタンをタップしてテーブル番号を選択</li>
+            <li>AIバーテンダーとチャットでカクテルについて相談</li>
+            <li>メニューから好みの飲み物や食べ物を注文</li>
+            <li>注文履歴でステータスを確認</li>
+          </ol>
+        </div>
       </div>
 
-      <footer className="text-center text-zinc-500 text-sm mt-4">
+      <footer className="text-center text-zinc-500 text-sm mt-8">
         <p>カクテルの種類や好みを話しかけてみてください</p>
         <p className="mt-1">例: 「爽やかなカクテルが飲みたい」「ジンベースのおすすめは？」「学割について教えて」</p>
       </footer>
