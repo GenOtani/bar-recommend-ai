@@ -11,8 +11,13 @@ import { Toaster } from "@/components/ui/toaster"
 import { AdminInterface } from "@/components/admin-interface"
 import { useRouter } from "next/navigation"
 
-// 管理者パスワード（実際のアプリでは環境変数や安全な認証システムを使用すべき）
-const ADMIN_PASSWORD = "Gengen20024017"
+// 管理者パスワードを環境変数から読み込むように変更
+// 以下のコードを:
+// const ADMIN_PASSWORD = "Gengen20024017"
+
+// 次のように変更:
+// 環境変数からパスワードを読み込み、設定されていない場合はデフォルト値を使用
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "Gengen20024017"
 
 export default function AdminPage() {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
@@ -22,44 +27,169 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
-  // コンポーネントマウント時に認証状態を確認
+  // ログイン試行回数を追跡するためのステート変数を追加
+  const [loginAttempts, setLoginAttempts] = useState(0)
+  const MAX_LOGIN_ATTEMPTS = 5
+  const LOCKOUT_TIME = 15 * 60 * 1000 // 15分（ミリ秒）
+
+  // useEffect内のコードを修正して、パスワードの強度をチェックする機能を追加
+  // 以下のuseEffectブロックを:
+  // useEffect(() => {
+  //   const adminAuth = localStorage.getItem("admin-auth")
+  //   if (adminAuth === "authenticated") {
+  //     setIsAuthenticated(true)
+  //   } else {
+  //     setLoginDialogOpen(true)
+  //   }
+  //   setIsLoading(false)
+  // }, [])
+
+  // 次のように変更:
   useEffect(() => {
     const adminAuth = localStorage.getItem("admin-auth")
-    if (adminAuth === "authenticated") {
-      setIsAuthenticated(true)
+    if (adminAuth) {
+      try {
+        const authData = JSON.parse(adminAuth)
+        if (authData.authenticated && authData.timestamp && Date.now() - authData.timestamp < 24 * 60 * 60 * 1000) {
+          // 24時間以内
+          setIsAuthenticated(true)
+        } else {
+          localStorage.removeItem("admin-auth")
+          setLoginDialogOpen(true)
+        }
+      } catch (e) {
+        localStorage.removeItem("admin-auth")
+        setLoginDialogOpen(true)
+      }
     } else {
       setLoginDialogOpen(true)
     }
+
+    // パスワードが環境変数で設定されていない場合は警告を表示
+    if (!process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+      console.warn("管理者パスワードが環境変数で設定されていません。デフォルトパスワードが使用されます。")
+    }
+
     setIsLoading(false)
   }, [])
 
-  // 管理者ログイン処理
-  const handleAdminLogin = () => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
-      setLoginDialogOpen(false)
-      setPassword("")
-      setIsPasswordIncorrect(false)
-      // 認証状態を保存（実際のアプリではより安全な方法を使用すべき）
-      localStorage.setItem("admin-auth", "authenticated")
+  // handleAdminLogin関数を強化して、ログイン試行回数を制限する
+  // 以下のコードを:
+  // const handleAdminLogin = () => {
+  //   if (password === ADMIN_PASSWORD) {
+  //     setIsAuthenticated(true)
+  //     setLoginDialogOpen(false)
+  //     setPassword("")
+  //     setIsPasswordIncorrect(false)
+  //     // 認証状態を保存（実際のアプリではより安全な方法を使用すべき）
+  //     localStorage.setItem("admin-auth", "authenticated")
+  //     toast({
+  //       title: "管理者モードにログインしました",
+  //       description: "管理者機能が利用可能になりました。",
+  //     })
+  //   } else {
+  //     setIsPasswordIncorrect(true)
+  //   }
+  // }
+
+  // 次のように変更:
+  // そして、handleAdminLogin関数を次のように変更:
+  const handleAdminLogin = async () => {
+    if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
       toast({
-        title: "管理者モードにログインしました",
-        description: "管理者機能が利用可能になりました。",
+        title: "ログインがロックされています",
+        description: `セキュリティのため、${MAX_LOGIN_ATTEMPTS}回の失敗後、15分間ログインが制限されています。`,
+        variant: "destructive",
       })
-    } else {
-      setIsPasswordIncorrect(true)
+      return
+    }
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setIsAuthenticated(true)
+        setLoginDialogOpen(false)
+        setPassword("")
+        setIsPasswordIncorrect(false)
+        setLoginAttempts(0) // 成功したらカウンターをリセット
+
+        toast({
+          title: "管理者モードにログインしました",
+          description: "管理者機能が利用可能になりました。",
+        })
+      } else {
+        setIsPasswordIncorrect(true)
+        setLoginAttempts((prev) => prev + 1)
+
+        if (loginAttempts + 1 >= MAX_LOGIN_ATTEMPTS) {
+          toast({
+            title: "ログイン試行回数の上限に達しました",
+            description: "セキュリティのため、15分間ログインが制限されます。",
+            variant: "destructive",
+          })
+
+          // 15分後にロックを解除するタイマーを設定
+          setTimeout(() => {
+            setLoginAttempts(0)
+            toast({
+              title: "ログインロックが解除されました",
+              description: "再度ログインを試みることができます。",
+            })
+          }, LOCKOUT_TIME)
+        }
+      }
+    } catch (error) {
+      console.error("ログイン処理中にエラーが発生しました:", error)
+      toast({
+        title: "エラーが発生しました",
+        description: "ログイン処理中にエラーが発生しました。",
+        variant: "destructive",
+      })
     }
   }
 
   // 管理者ログアウト処理
-  const handleAdminLogout = () => {
-    setIsAuthenticated(false)
-    localStorage.removeItem("admin-auth")
-    router.push("/")
-    toast({
-      title: "ログアウトしました",
-      description: "管理者モードからログアウトしました。",
-    })
+  const handleAdminLogout = async () => {
+    try {
+      const response = await fetch("/api/admin/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        setIsAuthenticated(false)
+        localStorage.removeItem("admin-auth")
+        router.push("/")
+        toast({
+          title: "ログアウトしました",
+          description: "管理者モードからログアウトしました。",
+        })
+      } else {
+        toast({
+          title: "エラーが発生しました",
+          description: "ログアウト処理中にエラーが発生しました。",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("ログアウト処理中にエラーが発生しました:", error)
+      toast({
+        title: "エラーが発生しました",
+        description: "ログアウト処理中にエラーが発生しました。",
+        variant: "destructive",
+      })
+    }
   }
 
   if (isLoading) {
