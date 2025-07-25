@@ -9,9 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    serverComponentsExternalPackages: ['googleapis', 'google-auth-library', 'nodemailer'],
-  },
+  serverExternalPackages: ['googleapis', 'google-auth-library', 'nodemailer'],
 };
 
 export default nextConfig;
