@@ -45,27 +45,18 @@ export const useOrderStore = create<OrderState>()(
           // 更新後の注文数をログ
           logDebug(`現在の注文数: ${newOrders.length}`)
 
-          // 同期イベントを発火する前に、まず状態を更新
-          const newState = { orders: newOrders, lastUpdated: Date.now() }
+          // APIに注文を送信
+          fetch("/api/orders", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ order }),
+          }).catch((error) => {
+            console.error("注文の送信に失敗しました:", error)
+          })
 
-          // 同期イベントを発火（非同期で）
-          setTimeout(() => {
-            try {
-              localStorage.setItem(
-                "order-sync-event",
-                JSON.stringify({
-                  type: "add-order",
-                  timestamp: Date.now(),
-                  order,
-                }),
-              )
-              logDebug(`同期イベント発火: add-order ${order.id}`)
-            } catch (error) {
-              console.error("同期イベントの保存に失敗しました:", error)
-            }
-          }, 100)
-
-          return newState
+          return { orders: newOrders, lastUpdated: Date.now() }
         })
       },
 
@@ -88,24 +79,16 @@ export const useOrderStore = create<OrderState>()(
 
           logDebug(`注文ステータスを更新しました: ${orderId} -> ${status}`)
 
-          // 同期イベントを発火（非同期で）
-          setTimeout(() => {
-            try {
-              localStorage.setItem(
-                "order-sync-event",
-                JSON.stringify({
-                  type: "update-status",
-                  timestamp: Date.now(),
-                  orderId,
-                  status,
-                  order: updatedOrder,
-                }),
-              )
-              logDebug(`同期イベント発火: update-status ${orderId} -> ${status}`)
-            } catch (error) {
-              console.error("同期イベントの保存に失敗しました:", error)
-            }
-          }, 100)
+          // APIにステータス更新を送信
+          fetch("/api/orders", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ orderId, status }),
+          }).catch((error) => {
+            console.error("ステータス更新の送信に失敗しました:", error)
+          })
 
           return { orders: updatedOrders, lastUpdated: Date.now() }
         })
@@ -113,21 +96,6 @@ export const useOrderStore = create<OrderState>()(
 
       clearOrders: () => {
         set({ orders: [], lastUpdated: Date.now() })
-
-        // 同期イベントを発火（非同期で）
-        setTimeout(() => {
-          try {
-            localStorage.setItem(
-              "order-sync-event",
-              JSON.stringify({
-                type: "clear-orders",
-                timestamp: Date.now(),
-              }),
-            )
-          } catch (error) {
-            console.error("同期イベントの保存に失敗しました:", error)
-          }
-        }, 100)
       },
 
       syncOrders: (orders) => {
@@ -137,104 +105,42 @@ export const useOrderStore = create<OrderState>()(
 
       getOrders: () => get().orders,
 
-      // 強制的に更新を行うメソッド - 修正版
+      // 強制的に更新を行うメソッド
       forceUpdate: () => {
         try {
           logDebug("forceUpdate 呼び出し")
-          const orderStorageData = localStorage.getItem("order-storage")
-          if (orderStorageData) {
-            const parsedData = JSON.parse(orderStorageData)
-            if (parsedData.state && Array.isArray(parsedData.state.orders)) {
-              logDebug(`forceUpdate: 注文データを読み込みました (${parsedData.state.orders.length}件)`)
 
-              // 現在の状態と比較して変更があるか確認
-              const currentOrders = get().orders
-              const newOrders = parsedData.state.orders
-
-              // 注文数が異なる場合は更新
-              if (currentOrders.length !== newOrders.length) {
-                logDebug(`注文数が変更されました: ${currentOrders.length} -> ${newOrders.length}`)
-                set({
-                  orders: newOrders,
-                  lastUpdated: Date.now(),
-                })
-                return true
+          // APIから最新の注文データを取得
+          fetch("/api/orders")
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.orders) {
+                const currentOrders = get().orders
+                if (currentOrders.length !== data.orders.length) {
+                  logDebug(`注文数が変更されました: ${currentOrders.length} -> ${data.orders.length}`)
+                  set({
+                    orders: data.orders,
+                    lastUpdated: Date.now(),
+                  })
+                  return true
+                }
               }
-
-              // 注文IDを比較して変更があるか確認
-              const currentIds = new Set(currentOrders.map((o) => o.id))
-              const hasNewOrders = newOrders.some((o) => !currentIds.has(o.id))
-
-              if (hasNewOrders) {
-                logDebug("新しい注文が見つかりました")
-                set({
-                  orders: newOrders,
-                  lastUpdated: Date.now(),
-                })
-                return true
-              }
-
-              // ステータスの変更を確認
-              const hasStatusChanges = newOrders.some((newOrder) => {
-                const currentOrder = currentOrders.find((o) => o.id === newOrder.id)
-                return currentOrder && currentOrder.status !== newOrder.status
-              })
-
-              if (hasStatusChanges) {
-                logDebug("注文ステータスの変更が見つかりました")
-                set({
-                  orders: newOrders,
-                  lastUpdated: Date.now(),
-                })
-                return true
-              }
-
-              logDebug("注文データに変更はありません")
               return false
-            } else {
-              logDebug("forceUpdate: 注文データの形式が不正です", parsedData)
-            }
-          } else {
-            logDebug("forceUpdate: localStorage に注文データがありません")
-          }
+            })
+            .catch((error) => {
+              console.error("注文データの取得に失敗しました:", error)
+            })
+
+          return true
         } catch (error) {
           console.error("注文データの同期中にエラーが発生しました:", error)
+          return false
         }
-        return false
       },
     }),
     {
-      name: "order-storage", // localStorageのキー名
-      partialize: (state) => ({ orders: state.orders, lastUpdated: state.lastUpdated }), // 永続化する状態の一部を選択
+      name: "order-storage",
+      partialize: (state) => ({ orders: state.orders, lastUpdated: state.lastUpdated }),
     },
   ),
 )
-
-// 注文データを強制的に同期するヘルパー関数
-export const syncOrdersAcrossTabs = () => {
-  try {
-    logDebug("syncOrdersAcrossTabs 呼び出し")
-
-    // 現在のタブのデータを更新
-    const store = useOrderStore.getState()
-    const success = store.forceUpdate()
-    logDebug(`syncOrdersAcrossTabs: 同期結果 ${success ? "成功" : "変更なし"}`)
-
-    // 他のタブに通知（非同期で）
-    setTimeout(() => {
-      localStorage.setItem(
-        "order-sync-event",
-        JSON.stringify({
-          type: "force-sync",
-          timestamp: Date.now(),
-        }),
-      )
-      logDebug("force-sync イベント発火")
-    }, 100)
-
-    return success
-  } catch (error) {
-    console.error("タブ間同期中にエラーが発生しました:", error)
-    return false
-  }
-}

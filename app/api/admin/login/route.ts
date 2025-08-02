@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     // 環境変数から管理者パスワードを取得
     const adminPassword = process.env.ADMIN_PASSWORD || process.env.NEXT_PUBLIC_ADMIN_PASSWORD
 
-    // パスワードが設定されていない場合のデフォルト値（本番環境では使用すべきではない）
+    // パスワードが設定されていない場合のデフォルト値
     const defaultPassword = "Gengen20024017"
 
     // パスワードの検証
@@ -20,13 +20,12 @@ export async function POST(request: Request) {
         timestamp: Date.now(),
       }
 
-      // 認証情報をレスポンスヘッダーに設定
       const response = NextResponse.json({
         success: true,
         message: "認証に成功しました",
       })
 
-      // HTTPのみのCookieを設定（本番環境ではSecure: trueを使用すべき）
+      // HTTPのみのCookieを設定
       response.cookies.set({
         name: "admin-auth",
         value: JSON.stringify(authData),
