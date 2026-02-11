@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { toast } from "@/components/ui/use-toast"
 import { Download } from "lucide-react"
 import type { Order } from "@/types/order-types"
 
@@ -43,7 +44,7 @@ export function SimpleExport({ orders }: SimpleExportProps) {
           rows.push([
             "", // 注文ID
             "", // テーブル番号
-            "", // 注文日時
+            "", // 注��日時
             item.name,
             item.priceValue.toString(),
             item.quantity.toString(),
@@ -67,7 +68,11 @@ export function SimpleExport({ orders }: SimpleExportProps) {
   // CSVファイルをダウンロード
   const handleExport = () => {
     if (orders.length === 0) {
-      alert("注文履歴がありません")
+      toast({
+        title: "注文履歴がありません",
+        description: "エクスポートするデータがありません。",
+        variant: "destructive",
+      })
       return
     }
 
@@ -95,10 +100,17 @@ export function SimpleExport({ orders }: SimpleExportProps) {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
-      alert("CSVファイルをダウンロードしました")
+      toast({
+        title: "CSVファイルをダウンロードしました",
+        description: "Googleスプレッドシートで開くことができます。",
+      })
     } catch (error) {
       console.error("エクスポート中にエラーが発生しました:", error)
-      alert("CSVファイルの生成中にエラーが発生しました")
+      toast({
+        title: "エラーが発生しました",
+        description: "CSVファイルの生成中にエラーが発生しました。",
+        variant: "destructive",
+      })
     } finally {
       setIsExporting(false)
     }

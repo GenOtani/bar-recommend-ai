@@ -11,20 +11,35 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { toast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import { useRouter } from "next/navigation"
 
 export default function CocktailChatbot() {
   const router = useRouter()
+
+  // テーブル番号入力ダイアログの状態
   const [tableInputDialogOpen, setTableInputDialogOpen] = useState(false)
   const [tableNumber, setTableNumber] = useState("")
   const [isRedirecting, setIsRedirecting] = useState(false)
 
+  // テーブル番号確定時の処理
   const handleTableConfirm = () => {
     if (tableNumber) {
       setIsRedirecting(true)
+
+      // テーブル番号が選択されたら、対応するURLにリダイレクト
       router.push(`/table/${tableNumber}`)
+
+      // ダイアログを閉じる
       setTableInputDialogOpen(false)
+    } else {
+      toast({
+        title: "テーブル番号を選択してください",
+        variant: "destructive",
+      })
     }
   }
 
@@ -42,12 +57,22 @@ export default function CocktailChatbot() {
             管理者ログイン
           </Button>
           <h1 className="text-3xl font-bold text-amber-400">バーテンダーAI</h1>
-          <div className="w-[100px]"></div>
+          <div className="w-[100px]"></div> {/* 右側のスペース確保 */}
         </div>
         <p className="text-zinc-400">あなたの好みに合わせたカクテルをご提案します</p>
       </header>
 
-      <Dialog open={tableInputDialogOpen} onOpenChange={setTableInputDialogOpen}>
+      {/* テーブル番号選択ダイアログ */}
+      <Dialog
+        open={tableInputDialogOpen}
+        onOpenChange={(open) => {
+          // リダイレクト中はダイアログを閉じられないようにする
+          if (isRedirecting && !open) {
+            return
+          }
+          setTableInputDialogOpen(open)
+        }}
+      >
         <DialogContent className="bg-zinc-800 border-zinc-700 text-white">
           <DialogHeader>
             <DialogTitle className="text-amber-400">テーブル番号を選択してください</DialogTitle>
@@ -56,24 +81,20 @@ export default function CocktailChatbot() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="grid grid-cols-3 gap-4">
+            <RadioGroup value={tableNumber} onValueChange={setTableNumber} className="grid grid-cols-3 gap-4">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                 <div key={num} className="flex items-center space-x-2">
-                  <input
-                    type="radio"
+                  <RadioGroupItem
                     value={num.toString()}
                     id={`table-${num}`}
-                    name="tableNumber"
-                    checked={tableNumber === num.toString()}
-                    onChange={(e) => setTableNumber(e.target.value)}
-                    className="text-amber-400"
+                    className="text-amber-400 border-amber-400"
                   />
                   <Label htmlFor={`table-${num}`} className="text-white">
                     テーブル {num}
                   </Label>
                 </div>
               ))}
-            </div>
+            </RadioGroup>
           </div>
           <DialogFooter>
             <Button
@@ -81,12 +102,20 @@ export default function CocktailChatbot() {
               onClick={handleTableConfirm}
               disabled={!tableNumber || isRedirecting}
             >
-              {isRedirecting ? "移動中..." : "確定"}
+              {isRedirecting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  移動中...
+                </>
+              ) : (
+                "確定"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* メインコンテンツ */}
       <div className="w-full max-w-2xl text-center">
         <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8 shadow-lg">
           <h2 className="text-2xl font-bold text-amber-400 mb-4">ようこそ！</h2>
@@ -116,6 +145,8 @@ export default function CocktailChatbot() {
         <p>カクテルの種類や好みを話しかけてみてください</p>
         <p className="mt-1">例: 「爽やかなカクテルが飲みたい」「ジンベースのおすすめは？」「学割について教えて」</p>
       </footer>
+
+      <Toaster />
     </div>
   )
 }
